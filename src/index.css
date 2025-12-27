@@ -1,0 +1,48 @@
+/* Tailwind v4 Replacement */
+@import "tailwindcss";
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+}
+
+/* Base styles */
+body {
+  color: white;
+  background: black;
+  margin: 0;
+  padding: 0;
+}
+
+/* Your existing animations are fine here below the import */
+@media (min-width: 768px) {
+  body, a, button {
+    cursor: none;
+  }
+}
+
+/* Keyframes and Animations (Keep these exactly as you have them) */
+@keyframes flicker-transition {
+  0% { opacity: 0; }
+  10% { opacity: 0; }
+  11% { opacity: 0.4; }
+  12% { opacity: 0; }
+  13% { opacity: 0.4; }
+  20% { opacity: 0; }
+  25% { opacity: 0.6; }
+  30% { opacity: 0.2; }
+  35% { opacity: 0.6; }
+  100% { opacity: 0.6; }
+}
+
+.animate-flicker-transition {
+  animation: flicker-transition 2s linear forwards;
+}
+
+/* Force cursor visibility */
+html, body, a, button {
+  cursor: auto !important;
+}
+
+/* ... keep the rest of your glitch, scanline, and marquee animations here ... */
