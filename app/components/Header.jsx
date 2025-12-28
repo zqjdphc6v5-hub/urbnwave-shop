@@ -1,97 +1,212 @@
-import {Await, NavLink, useAsyncValue} from 'react-router';
-import {Suspense} from 'react';
+import {NavLink} from '@remix-run/react';
 import {useAside} from '~/components/Aside';
 
-export function Header({header, cart, isLoggedIn}) {
+/**
+ * @param {HeaderProps}
+ */
+export function Header({header, isLoggedIn, cart}) {
   const {shop, menu} = header;
+  return (
+    <header className="header">
+      <NavLink prefetch="intent" to="/" style={activeLinkStyle} end>
+        <strong>{shop.name}</strong>
+      </NavLink>
+      <HeaderMenu
+        menu={menu}
+        viewport="desktop"
+        primaryDomainUrl={header.shop.primaryDomain.url}
+      />
+      <HeaderCtas isLoggedIn={isLoggedIn} cart={cart} />
+    </header>
+  );
+}
+
+/**
+ * @param {{
+ * menu: HeaderProps['header']['menu'];
+ * primaryDomainUrl: HeaderProps['header']['shop']['primaryDomain']['url'];
+ * viewport: 'desktop' | 'mobile';
+ * }}
+ */
+export function HeaderMenu({menu, primaryDomainUrl, viewport}) {
+  const {type, close} = useAside();
+  const className = `header-menu-${viewport}`;
+
+  function closeAside(event) {
+    if (viewport === 'mobile') {
+      event.preventDefault();
+      window.location.href = event.currentTarget.href;
+      close();
+    }
+  }
 
   return (
-    <header className="header fixed top-0 w-full z-50 bg-neutral-950/80 backdrop-blur-md border-b border-white/10 transition-all duration-300">
-      <div className="flex items-center justify-between px-6 py-4 h-16 md:h-20 max-w-[1920px] mx-auto">
-        
-        {/* LEFT: Logo / Brand */}
-        <NavLink prefetch="intent" to="/" className="z-10 group">
-          <h1 className="text-xl md:text-2xl font-black italic tracking-tighter uppercase text-white group-hover:text-red-600 transition-colors">
-            {shop.name}
-            <span className="hidden md:inline-block text-[10px] font-mono font-normal text-neutral-500 ml-2 not-italic tracking-widest">
-              // SYS.ONLINE
-            </span>
-          </h1>
+    <nav className={className} role="navigation">
+      {viewport === 'mobile' && (
+        <NavLink
+          end
+          onClick={close}
+          prefetch="intent"
+          style={activeLinkStyle}
+          to="/"
+        >
+          Home
         </NavLink>
+      )}
+      {(menu || FALLBACK_HEADER_MENU).items.map((item) => {
+        if (!item.url) return null;
 
-        {/* CENTER: Navigation (Desktop) */}
-        <nav className="hidden md:flex gap-8 absolute left-1/2 -translate-x-1/2">
-          {(menu?.items || []).map((item) => (
-            <NavLink
-              key={item.id}
-              to={item.url}
-              prefetch="intent"
-              className={({isActive}) => `
-                text-xs font-mono tracking-[0.2em] uppercase transition-colors
-                ${isActive ? 'text-red-600 border-b border-red-600' : 'text-neutral-400 hover:text-white'}
-              `}
-            >
-              {item.title}
-            </NavLink>
-          ))}
-        </nav>
+        // if the url is internal, we strip the domain
+        const url =
+          item.url.includes('myshopify.com') ||
+          item.url.includes(primaryDomainUrl)
+            ? new URL(item.url).pathname
+            : item.url;
+        return (
+          <NavLink
+            className="header-menu-item"
+            end
+            key={item.id}
+            onClick={closeAside}
+            prefetch="intent"
+            style={activeLinkStyle}
+            to={url}
+          >
+            {item.title}
+          </NavLink>
+        );
+      })}
+    </nav>
+  );
+}
 
-        {/* RIGHT: Actions (Search / Cart) */}
-        <div className="flex items-center gap-6 z-10">
-          <SearchToggle />
-          <CartToggle cart={cart} />
-        </div>
-      </div>
-    </header>
+/**
+ * @param {Pick<HeaderProps, 'isLoggedIn' | 'cart'>}
+ */
+function HeaderCtas({isLoggedIn, cart}) {
+  return (
+    <nav className="header-ctas" role="navigation">
+      <HeaderMenuMobileToggle />
+      <NavLink prefetch="intent" to="/account" style={activeLinkStyle}>
+        <Suspense fallback="Sign in">
+          <Await resolve={isLoggedIn}>
+            {(isLoggedIn) => (isLoggedIn ? 'Account' : 'Sign in')}
+          </Await>
+        </Suspense>
+      </NavLink>
+      <SearchToggle />
+      <CartToggle cart={cart} />
+    </nav>
+  );
+}
+
+function HeaderMenuMobileToggle() {
+  const {open} = useAside();
+  return (
+    <button
+      className="header-menu-mobile-toggle reset"
+      onClick={() => open('mobile')}
+    >
+      <h3>☰</h3>
+    </button>
   );
 }
 
 function SearchToggle() {
   const {open} = useAside();
   return (
-    <button 
-      className="text-white hover:text-red-600 transition-colors" 
-      onClick={() => open('search')}
-    >
-      <span className="sr-only">Search</span>
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-        <path strokeLinecap="square" strokeLinejoin="miter" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-      </svg>
+    <button className="reset" onClick={() => open('search')}>
+      Search
     </button>
   );
 }
 
+/**
+ * @param {{cart: HeaderProps['cart']}}
+ */
 function CartToggle({cart}) {
   const {open} = useAside();
-  
   return (
-    <Suspense fallback={<CartBadge count={0} open={open} />}>
+    <Suspense fallback={<CartBadge count={0} />}>
       <Await resolve={cart}>
-        {(cart) => (
-          <CartBadge 
-            count={cart?.totalQuantity || 0} 
-            open={open} 
-          />
-        )}
+        {(cart) => {
+          if (!cart) return <CartBadge count={0} />;
+          return <CartBadge count={cart.totalQuantity || 0} />;
+        }}
       </Await>
     </Suspense>
   );
 }
 
-function CartBadge({count, open}) {
+/**
+ * @param {{count: number}}
+ */
+function CartBadge({count}) {
+  const {open} = useAside();
   return (
-    <button
-      onClick={() => open('cart')}
-      className="relative flex items-center gap-2 group"
-    >
-      <span className="hidden md:block font-mono text-[10px] uppercase tracking-widest text-neutral-400 group-hover:text-white transition-colors">
-        System_Cart
-      </span>
-      <div className="flex items-center justify-center w-8 h-8 border border-neutral-700 bg-neutral-900 group-hover:border-red-600 transition-colors">
-        <span className="font-mono text-xs text-white group-hover:text-red-600">
-          [{count}]
-        </span>
-      </div>
+    <button className="reset" onClick={() => open('cart')}>
+      Cart {count}
     </button>
   );
 }
+
+/**
+ * @param {{isActive: boolean; isPending: boolean}}
+ */
+function activeLinkStyle({isActive, isPending}) {
+  return {
+    fontWeight: isActive ? 'bold' : undefined,
+    color: isPending ? 'grey' : 'black',
+  };
+}
+
+/** @type {HeaderProps['header']['menu']} */
+const FALLBACK_HEADER_MENU = {
+  id: 'gid://shopify/Menu/199655587896',
+  items: [
+    {
+      id: 'gid://shopify/MenuItem/461609500728',
+      resourceId: null,
+      tags: [],
+      title: 'Collections',
+      url: '/collections',
+      items: [],
+    },
+    {
+      id: 'gid://shopify/MenuItem/461609533496',
+      resourceId: null,
+      tags: [],
+      title: 'Blog',
+      url: '/blogs/journal',
+      items: [],
+    },
+    {
+      id: 'gid://shopify/MenuItem/461609566264',
+      resourceId: null,
+      tags: [],
+      title: 'Policies',
+      url: '/policies',
+      items: [],
+    },
+    {
+      id: 'gid://shopify/MenuItem/461609599032',
+      resourceId: 'gid://shopify/Page/92591030328',
+      tags: [],
+      title: 'About',
+      url: '/pages/about',
+      items: [],
+    },
+  ],
+};
+
+/**
+ * @typedef {import('~/root').RootLoader} RootLoader
+ * @typedef {import('~/root').HeaderQuery} HeaderQuery
+ * @typedef {Object} HeaderProps
+ * @property {HeaderQuery} header
+ * @property {Promise<boolean>} isLoggedIn
+ * @property {Promise<import('@shopify/hydrogen').CartApiQueryReturn | null>} cart
+ */
+
+import {Suspense} from 'react';
+import {Await} from '@remix-run/react';

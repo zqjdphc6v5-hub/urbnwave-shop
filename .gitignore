@@ -4,3 +4,7 @@ node_modules/
 .vite-temp/
 .env
 dist/
+
+# macOS
+.DS_Store
+**/.DS_Store

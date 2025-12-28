@@ -1,34 +1,23 @@
-import {useLoaderData, data} from 'react-router';
+import {useLoaderData} from '@remix-run/react';
+import {json} from '@shopify/remix-oxygen';
 import {CartForm} from '@shopify/hydrogen';
 import {CartMain} from '~/components/CartMain';
 
 /**
- * @type {Route.MetaFunction}
- */
-export const meta = () => {
-  return [{title: `Hydrogen | Cart`}];
-};
-
-/**
- * @type {HeadersFunction}
- */
-export const headers = ({actionHeaders}) => actionHeaders;
-
-/**
- * @param {Route.ActionArgs}
+ * Handles all cart mutations (Add, Update, Remove, Discount Codes).
+ * This is triggered by <CartForm /> components in your UI.
+ * @param {import('@remix-run/node').ActionFunctionArgs}
  */
 export async function action({request, context}) {
   const {cart} = context;
 
   const formData = await request.formData();
-
   const {action, inputs} = CartForm.getFormInput(formData);
 
   if (!action) {
     throw new Error('No action provided');
   }
 
-  let status = 200;
   let result;
 
   switch (action) {
@@ -44,76 +33,52 @@ export async function action({request, context}) {
     case CartForm.ACTIONS.DiscountCodesUpdate: {
       const formDiscountCode = inputs.discountCode;
 
-      // User inputted discount code
+      // User can pass one or more discount codes
       const discountCodes = formDiscountCode ? [formDiscountCode] : [];
 
-      // Combine discount codes already applied on cart
-      discountCodes.push(...inputs.discountCodes);
+      // Combine existing discount codes with the new ones
+      const existingDiscountCodes = inputs.discountCodes || [];
 
-      result = await cart.updateDiscountCodes(discountCodes);
-      break;
-    }
-    case CartForm.ACTIONS.GiftCardCodesUpdate: {
-      const formGiftCardCode = inputs.giftCardCode;
-
-      // User inputted gift card code
-      const giftCardCodes = formGiftCardCode ? [formGiftCardCode] : [];
-
-      // Combine gift card codes already applied on cart
-      giftCardCodes.push(...inputs.giftCardCodes);
-
-      result = await cart.updateGiftCardCodes(giftCardCodes);
-      break;
-    }
-    case CartForm.ACTIONS.GiftCardCodesRemove: {
-      const appliedGiftCardIds = inputs.giftCardCodes;
-      result = await cart.removeGiftCardCodes(appliedGiftCardIds);
+      result = await cart.updateDiscountCodes([
+        ...existingDiscountCodes,
+        ...discountCodes,
+      ]);
       break;
     }
     case CartForm.ACTIONS.BuyerIdentityUpdate: {
-      result = await cart.updateBuyerIdentity({
-        ...inputs.buyerIdentity,
-      });
+      result = await cart.updateBuyerIdentity(inputs.buyerIdentity);
       break;
     }
     default:
       throw new Error(`${action} cart action is not defined`);
   }
 
-  const cartId = result?.cart?.id;
-  const headers = cartId ? cart.setCartId(result.cart.id) : new Headers();
-  const {cart: cartResult, errors, warnings} = result;
+  const cartId = result.cart.id;
+  const headers = cart.setCartId(result.cart.id);
+  const {cart: cartResult, errors} = result;
 
   const redirectTo = formData.get('redirectTo') ?? null;
   if (typeof redirectTo === 'string') {
-    status = 303;
-    headers.set('Location', redirectTo);
+    return statusMessage(cartResult, 303, {headers, errors, redirectTo});
   }
 
-  return data(
-    {
-      cart: cartResult,
-      errors,
-      warnings,
-      analytics: {
-        cartId,
-      },
-    },
-    {status, headers},
+  return json(
+    {cart: cartResult, errors},
+    {status: 200, headers},
   );
 }
 
 /**
- * @param {Route.LoaderArgs}
+ * Loads the cart data for the standalone /cart page.
+ * @param {import('@remix-run/node').LoaderFunctionArgs}
  */
 export async function loader({context}) {
   const {cart} = context;
-  return await cart.get();
+  return json({cart: await cart.get()});
 }
 
 export default function Cart() {
-  /** @type {LoaderReturnData} */
-  const cart = useLoaderData();
+  const {cart} = useLoaderData();
 
   return (
     <div className="cart">
@@ -123,8 +88,18 @@ export default function Cart() {
   );
 }
 
-/** @typedef {import('react-router').HeadersFunction} HeadersFunction */
-/** @typedef {import('./+types/cart').Route} Route */
-/** @typedef {import('@shopify/hydrogen').CartQueryDataReturn} CartQueryDataReturn */
-/** @typedef {import('@shopify/remix-oxygen').SerializeFrom<typeof loader>} LoaderReturnData */
-/** @typedef {import('@shopify/remix-oxygen').SerializeFrom<typeof action>} ActionReturnData */
+/**
+ * Helper to handle redirects after cart actions
+ */
+function statusMessage(cart, status, {headers, errors, redirectTo}) {
+  return json(
+    {cart, errors},
+    {
+      status,
+      headers: {
+        ...headers,
+        Location: redirectTo,
+      },
+    },
+  );
+}

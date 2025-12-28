@@ -1,24 +1,8 @@
 import {useRef, useEffect} from 'react';
-import {Form} from 'react-router';
+import {Form} from '@remix-run/react';
 
 /**
  * Search form component that sends search requests to the `/search` route.
- * @example
- * ```tsx
- * <SearchForm>
- *  {({inputRef}) => (
- *    <>
- *      <input
- *        ref={inputRef}
- *        type="search"
- *        defaultValue={term}
- *        name="q"
- *        placeholder="Search…"
- *      />
- *      <button type="submit">Search</button>
- *   </>
- *  )}
- *  </SearchForm>
  * @param {SearchFormProps}
  */
 export function SearchForm({children, ...props}) {
@@ -42,10 +26,9 @@ export function SearchForm({children, ...props}) {
  * @param {React.RefObject<HTMLInputElement>} inputRef
  */
 function useFocusOnCmdK(inputRef) {
-  // focus the input when cmd+k is pressed
   useEffect(() => {
     function handleKeyDown(event) {
-      if (event.key === 'k' && event.metaKey) {
+      if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
         event.preventDefault();
         inputRef.current?.focus();
       }
@@ -56,19 +39,6 @@ function useFocusOnCmdK(inputRef) {
     }
 
     document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [inputRef]);
 }
-
-/**
- * @typedef {Omit<FormProps, 'children'> & {
- *   children: (args: {
- *     inputRef: React.RefObject<HTMLInputElement>;
- *   }) => React.ReactNode;
- * }} SearchFormProps
- */
-
-/** @typedef {import('react-router').FormProps} FormProps */
