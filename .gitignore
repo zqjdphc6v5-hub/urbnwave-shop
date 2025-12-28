@@ -8,3 +8,6 @@ dist/
 # macOS
 .DS_Store
 **/.DS_Store
+
+# React Router cache
+.react-router/
